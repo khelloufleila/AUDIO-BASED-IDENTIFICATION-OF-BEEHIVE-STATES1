@@ -89,6 +89,8 @@ from tensorflow.keras import initializers
 from sklearn.metrics import accuracy_score 
 import pandas as pd 
 import csv
+import numpy as np
+import scipy as sc
 #________________________________________________________________
 import timbre_descriptor as td
 import scipy as sc
@@ -106,6 +108,37 @@ import time               # used performance benchmark
 nbits = 16;
 MAX_VAL = pow(2,(nbits-1)) * 1.0;
 class_names= ['missing queen', 'active' ]
+
+
+
+#______________________________________________________________________________________________________________
+#----------------------------------- parameters to change-----------------------------------#
+block_size=1 # blocks of 1 second
+thresholds=[0, 0.5]  # minimum length for nobee intervals: 0 or 5 seconds (creates one label file per threshold value)
+path_audioFiles="C:\\Users\PC\python\Stage\To Bee or not to Bee_the annotated dataset"+os.sep  # path to audio files
+annotations_path="C:\\Users\PC\python\Stage\To Bee or not to Bee_the annotated dataset"+os.sep # path to .lab files
+path_save_audio_labels= 'C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+os.sep  # path where to save audio segments and labels files.
+#----------------------------------- parameters to change-----------------------------------#
+path_workingFolder='C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+os.sep  # path where to save audio segments and labels files.
+labels2read= 'state_labels'
+feature = 'MFCCs20'
+path_working_MFCCs20= 'C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+'\\MFCCs20_matrix.mat'+os.sep
+path_working_TTBox= 'C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+'\\TTBox_matrix.mat'+os.sep
+path_working_stft= 'C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+'\\stft_matrix.mat'+os.sep
+path_working_cqt= 'C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+'\\cqt_matrix.mat'+os.sep
+
+
+path_save_audio_MFCCs= 'C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+'\\MFCCs20_matrix.mat'+os.sep 
+path_save_audio_ttbox= 'C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+'\\ttb_mat'+os.sep 
+path_save_audio_stft= 'C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+'\\stft_matrix.mat'+os.sep 
+path_save_audio_cqt= 'C:\\Users\\PC\\python\\Stage\\dataset_BeeNoBee_2_second'+str(block_size)+'sec'+'\\cqt_matrix.mat'+os.sep 
+
+nbits = 16;
+MAX_VAL = pow(2,(nbits-1)) * 1.0;
+target_names=['missing_queen', 'active']
+
+
+
 #__________________________________________________  Decomposition in  k_ block _____________________________________
 # # load_audioFiles_saves_segments,  write_Statelabels_from_beeNotBeelabels, get_list_samples_name, write_sample_ids_perHive, split_samples_byHive, split_samples_ramdom
 
@@ -395,9 +428,11 @@ def raw_feature_fromSample( path_audio_sample, feature2extract ):
     # Short-time Fourier transform    
     elif 'stft' in feature2extract:
         x= librosa.stft(s , n_fft=2048)
-    # constante Q transform    
+        
+    # constante Q transform  Using a higher frequency resolution  
     elif 'cqt' in  feature2extract:
-        x=  np.abs(librosa.cqt(s, Fs))
+        x = np.abs(librosa.cqt(s, sr=Fs, fmin=librosa.note_to_hz('C2'), n_bins=60 * 2, bins_per_octave=12 * 2))
+        
     # timber tool box     
     elif 'TTBOX' in feature2extract:
         r_Fs = librosa.resample(s, Fs, 44100)
@@ -411,6 +446,7 @@ def raw_feature_fromSample( path_audio_sample, feature2extract ):
         ### Time serie integration
         param_val, field_name = td.temporalmodeling(desc);
         x=param_val
+    
         
     else:
         x = Melspec
@@ -443,7 +479,7 @@ def get_features_from_samples(path_audio_samples, sample_ids, raw_feature, norma
        # Sauvgarder les x dans un fichier .mat 
      
         b = csr_matrix(x)
-        savemat(path_working+ sample + '.mat', {'b': b})
+        savemat(path_working+ sample[:-4] + '.mat', {'b': b})
          
                          
                     
@@ -468,50 +504,6 @@ def get_features_from_samples(path_audio_samples, sample_ids, raw_feature, norma
         feature_Maps.append(feature_map)
         
     return feature_Maps
-
-def get_list_samples_name_MFCC(path_audioSegments, extension='.mat'):
-    states=['active','missing queen','swarm' ]
-    X_ttbox=[]
-    labels=[]
-    Y=[]
-    sample_ids=[]
-    # Recupèrer tout les audios d'extention .wav"""""" glob.glob(path_audioSegments_folder+'*'+extension)""""""
-    #list_mfcc=[os.path.basename(x) for x in glob.glob(path_audioSegments+'*'+extension)]
-    
-    for x in glob.glob(path_audioSegments+'*'+extension): 
-        size=len(path_audioSegments)
-        sample=x[size:]
-        sample_ids.append(sample)
-        l= read_HiveState_fromSampleName( sample, states)
-        labels.append(l)
-        m=scipy.io.loadmat(x)
-        X_ttbox.append(m['b'])
-    
-    Y= labels2binary('active', labels)
-        
-    return X_ttbox,  labels , Y, sample_ids
-def get_list_samples_name_TTBOX(path_audioSegments, extension='.mat'):
-    states=['active','missing queen','swarm' ]
-    X_ttbox=[]
-    labels=[]
-    Y=[]
-    sample_ids=[]
-    # Recupèrer tout les audios d'extention .wav"""""" glob.glob(path_audioSegments_folder+'*'+extension)""""""
-    #list_mfcc=[os.path.basename(x) for x in glob.glob(path_audioSegments+'*'+extension)]
-    
-    for x in glob.glob(path_audioSegments+'*'+extension): 
-        size=len(path_audioSegments)
-        sample=x[size:]
-        sample_ids.append(sample)
-        l= read_HiveState_fromSampleName( sample, states)
-        labels.append(l)
-        m=scipy.io.loadmat(x)
-        X_ttbox.append(m['ttb_vec'])
-    
-    Y= labels2binary('active', labels)
-        
-    return X_ttbox,  labels , Y, sample_ids
-
 
 def labels2binary(pos_label, list_labels):  # pos_label = missing queen / nobee
     list_binary_labels=[]
@@ -550,6 +542,10 @@ def get_GT_labels_fromFiles(path_labels, sample_ids, labels2read) : #labels2read
     
        
     return labels  
+
+
+#__________________________________________4 folds _Cross Validation ______________________________________________________________
+# return the 4 folds : fold1= CF001+ CF003, fold2= CJ001+GH001, .....
 def get_list_samples_name_( mtx , path_audioSegments, extension='.mat' ):
     states=['active','missing queen','swarm' ]
     labels1=[]
@@ -608,7 +604,7 @@ def get_list_samples_name_( mtx , path_audioSegments, extension='.mat' ):
     return ruche1,Y1,labels1, sample_ids1, ruche2,Y2,labels2, sample_ids2, ruche3,Y3,labels3, sample_ids3, ruche4,Y4,labels4, sample_ids4
 #ruche1,Y1,labels1, sample_ids1, ruche2,Y2,labels2, sample_ids2, ruche3,Y3,labels3, sample_ids3, ruche4,Y4,labels4, sample_ids4=get_list_samples_name_MFCCS('b', path_save_audio_MFCCs)
 
-
+# Define the 4 Fold cross validation 
 def cross_validation_4folds(fold, ruche1,Y1, ruche2,Y2, ruche3,Y3, ruche4,Y4, sample_ids1 , sample_ids2 , sample_ids3 , sample_ids4):
     x_train=[]
     x_test=[]
@@ -655,6 +651,8 @@ def cross_validation_4folds(fold, ruche1,Y1, ruche2,Y2, ruche3,Y3, ruche4,Y4, sa
 #x_train, x_test, y_train, y_test, sample_ids_train, sample_ids_test= cross_validation_4folds(3, ruche1,Y1, ruche2,Y2, ruche3,Y3, ruche4,Y4, sample_ids1 , sample_ids2 , sample_ids3 , sample_ids4)  
 #len(x_train), len(x_test), len(y_train), len(y_test), len(sample_ids_train)
 
+# Fit and evaluate the model 
+
 def train_and_evaluate_model(model, X_train, Y_train, X_test, Y_test, y_test ,  nb_epoch, batch_size ,model_filename):
     # y_test is labels, Y_test is categorical labels
     
@@ -674,74 +672,44 @@ def train_and_evaluate_model(model, X_train, Y_train, X_test, Y_test, y_test ,  
     cnf_matrix = confusion_matrix(y_test, predictions )
     return results, best_acc, report, cnf_matrix 
 
-def get_items2replicate(list_Binary_labels, list_sample_ids):
-    
-    # get the samples to be replicated.
-    # input: list of labels and sample_ids with same oreder!
-    # ouptut: dictionary keys:name of samples to be replicated,  value: Number of times to replicate that sample.
-    
-    #assert( len(list_Binary_labels) - len(list_sample_ids) == 0), ('arguments should have the same number of elements)
-    dict_items_replicate={}
-    
-    n_samples = len(list_Binary_labels)# 193
-    #print("n_samples: ", list_Binary_labels)
-    n_positive_labels = sum(list_Binary_labels)#158 = le nbr de 1
-    #print("n_positive_labels: ",n_positive_labels)
-    n_negative_labels = n_samples - n_positive_labels #35= le nbr de 0
-    #print("n_negative_labels: ",n_negative_labels)
-    
-    pos_samples=[]
-    neg_samples=[]
-    
-    for i in range(n_samples):
-        if list_Binary_labels[i] == 1 :
-            #print("list_sample_ids[i]= : ", list_sample_ids[i])
-            pos_samples.append(list_sample_ids[i])
-        else: 
-            neg_samples.append(list_sample_ids[i])
-            
-    if n_positive_labels > n_negative_labels:
-        #print(n_positive_labels, n_negative_labels)
-        # Replicate negative samples as needed:
-        dif=n_positive_labels-n_negative_labels
-        items_replicate=random.choices(neg_samples, k=dif)
-       # print("neg_samples= ",neg_samples, "items_replicate=",items_replicate)
- 
-    elif n_positive_labels < n_negative_labels:
-        dif=n_negative_labels-n_positive_labels
-        items_replicate=random.choices(pos_samples, k=dif)
-              
-    dict_items_replicate=Counter(items_replicate)
-    #print(dict_items_replicate)
-    return dict_items_replicate
 
-def BalanceData_online(y_set, x_set, sample_ids_set):
-    
-    ## balances already processed data (X and Y, just before classifier) by replicating samples of the least represented class.
-    # input: y_set - binary labels of set, x_set - feature_maps of set, sample_ids_set - sample names in set, ( all have the same order!)
-    # output: X, Y and sample_ids with replicated samples concatenated 
-    
- 
-    printb( 'Balancing training data:' )
-    print('will randomly replicate samples from least represented class')
-    
-    x2concatenate = x_set
-    y2concatenate = y_set
-    sample_ids2concatenate = sample_ids_set
-    
-    dict_items_replicate = get_items2replicate(y_set,sample_ids_set )
-    #print("dict_items_replicate: ",dict_items_replicate)
-    
-    for i in range(len(sample_ids_set)):
-        if sample_ids_set[i] in dict_items_replicate.keys() :
-            
-            sample_ids2concatenate =np.concatenate([sample_ids2concatenate, [sample_ids_set[i]]*dict_items_replicate[sample_ids_set[i]]])
-            y2concatenate = np.concatenate([y2concatenate, [y_set[i]]*dict_items_replicate[sample_ids_set[i]]])
-            x2concatenate = np.concatenate([x2concatenate, [x_set[i]]*dict_items_replicate[sample_ids_set[i]]])
-            
-    return y2concatenate, x2concatenate, sample_ids2concatenate
+# train_test_split the data we take 0.7% training and 0.3% for the test 
+
+def constrainedsplit(y_train, x_test, y_test, ratio=0.7):
+	
+	nb_class = len(np.unique(y_test));   ## nb de classes
+	
+	N_max_test = round(len(y_train)/ratio * (1-ratio))
+	
+	N_test  = np.zeros(nb_class);
+	N_train = np.zeros(nb_class);
+	for i in range(nb_class):
+		N_test[i]  = round(len(y_test[y_test==i]))
+		N_train[i] = round(len(y_train[y_train==i]))
+	
+	I = np.argsort(N_test);
+	for i in range(nb_class):
+		j = I[i]
+		
+		N_max_tmp = round(N_train[j] / ratio * (1-ratio));
+		
+		n_tmp = int(min( N_test[j], N_max_tmp))
+		x_tmp = x_test[y_test==j,:]
+		y_tmp = y_test[y_test==j]
+		if i == 0:
+			x_test_out = x_tmp[0:n_tmp, :]
+			y_test_out = y_tmp[0:n_tmp]
+		else:
+			x_test_out = np.concatenate([x_test_out, x_tmp[0:n_tmp, :]])
+			y_test_out = np.concatenate([y_test_out, y_tmp[0:n_tmp]])
+	
+	return x_test_out,y_test_out
+
+
+
+
 #_____________________________________________________  SVM functions_________________________________________________________
-# get_samples_id_perSet, get_features_from_samples, get_GT_labels_fromFiles, labels2binary, SVM_Classification_inSplittedSets
+
 
 
 # SVM CLASSIFICATION:
@@ -781,9 +749,6 @@ def SVM_Classification_BeehiveSTATE(X_flat_train, y_train, X_flat_test, y_test, 
     return CLF, Test_GroundT, Train_GroundT, Test_Preds, Train_Preds, Test_Preds_Proba, Train_Preds_Proba 
 
 #_____________________________________________________CNN Classification __________________________________________
-
-# Uses normal initializer
-#initializer = normal(mean=0, stddev=0.01, seed=13)
 
 def deep_model(size):
     # Neural Network Architecture 
@@ -834,29 +799,9 @@ def deep_model(size):
     return model
 
 
-def fit_and_evaluate(train_x, val_x, train_y, val_y, EPOCHS=50, BATCH_SIZE=145 ):
-    model=None
-    model=deep_model(( 20,44, 1))
-    results= model.fit(train_x, train_y, epochs=EPOCHS, batch_size= BATCH_SIZE, callbacks=[early_stopping, model_checkpoint], verbose=1, validation_split=0.1)
-    print("Val Score :", model.evaluate(val_x, val_y))
-    return results 
 
 
 
-
-#_____________________________________TTBOX+SVM________________________________________________________________________
-
-def get_list_samples_name(path_audioSegments, extension='.mat'):
-    X_ttbox=[]
-    sample_ids=[]
-    # Recupèrer tout les audios d'extention .mat"""""" glob.glob(path_audioSegments_folder+'*'+extension)""""""
-    list_ttbox=[os.path.basename(x) for x in glob.glob(path_audioSegments+'*'+extension)]
-    for x in glob.glob(path_audioSegments+'*'+extension):
-        
-        sample_ids.append(x[63:])
-        m=scipy.io.loadmat(x)
-        X_ttbox.append(m['ttb_vec'])
-    return X_ttbox, sample_ids, list_ttbox
 
 
 
@@ -905,58 +850,8 @@ def Dense_Net(size):
 
 
 
-#_________________________________________________________________
 
-
-
-  
-def get_samples_id_perSet(pathSplitFile):  # reads split_id file
-
-   
-    split_dict=json.load(open (pathSplitFile, 'r'))
-    
-    sample_ids_test = split_dict['test'] 
-    sample_ids_train = split_dict['train'] 
-    sample_ids_val = split_dict['val']
-    return sample_ids_test, sample_ids_train, sample_ids_val
-
-
-def get_features_from_samples(path_audio_samples, sample_ids, raw_feature, normalization, high_level_features ): 
-    #normalization = NO, z_norm, min_max
-    ## function to extract features 
-    high_level_features = 0    #or 1 
-    
-    n_samples_set = len(sample_ids) # 4
-    feature_Maps = []
-    
-    for sample in sample_ids:
-        
-        # raw feature extraction:
-        x = raw_feature_fromSample( path_audio_samples+sample, raw_feature ) # x.shape: (4, 20, 2584)
-        
-        
-        ##normalization here:
-        if not normalization == 'NO':
-             x_norm = featureMap_normalization_block_level(x, normalizationType = normalization) 
-        else: x_norm = x
-        
-        if high_level_features:
-            # high level feature extraction:
-            if 'MFCCs' in raw_feature:
-                X = compute_statistics_overMFCCs(x_norm, 'yes') # X.shape: (4 , 120)
-            else: 
-                X = compute_statistics_overSpectogram(x_norm)
-                
-            feature_map=X
-        else:
-            feature_map=x_norm
-        
-        
-        feature_Maps.append(feature_map)
-        
-    return feature_Maps
-
-# For Plotting : 
+#_______________________________________ For Plotting_________________________________________________________________________________
             
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
@@ -1018,13 +913,166 @@ def plot_accuracy_val_accuracy(model_history):
     plt.legend()
     plt.show()
     
-def save_confusion_matrix(confusion_matrices, filename):
+def save_confusion_matrix(cnf_matrix, filename, class_names):
+    fig = plt.figure()
+    # Plot non-normalized confusion matrix
+
+    plot_confusion_matrix(cnf_matrix, classes=class_names,
+                      title=filename)
+    plt.savefig('confusion_matrix'+str(filename)+'.jpg')
     
-    for matrix in confusion_matrices:
-        fig = plt.figure()
-        plt.matshow(cm)
-        plt.title('Confusion Matrix '+str(filename))
-        plt.colorbar()
-        plt.ylabel('True Label')
-        plt.xlabel('Predicated Label')
-        plt.savefig('confusion_matrix'+str(filename)+'.jpg')    
+    
+    
+    
+    
+    
+    
+    
+#_____________________________________________________________________________________________________________
+
+
+
+
+def get_list_samples_name_MFCC(path_audioSegments, extension='.mat'):
+    states=['active','missing queen','swarm' ]
+    X_ttbox=[]
+    labels=[]
+    Y=[]
+    sample_ids=[]
+    # Recupèrer tout les audios d'extention .wav"""""" glob.glob(path_audioSegments_folder+'*'+extension)""""""
+    #list_mfcc=[os.path.basename(x) for x in glob.glob(path_audioSegments+'*'+extension)]
+    
+    for x in glob.glob(path_audioSegments+'*'+extension): 
+        size=len(path_audioSegments)
+        sample=x[size:]
+        sample_ids.append(sample)
+        l= read_HiveState_fromSampleName( sample, states)
+        labels.append(l)
+        m=scipy.io.loadmat(x)
+        X_ttbox.append(m['b'])
+    
+    Y= labels2binary('active', labels)
+        
+    return X_ttbox,  labels , Y, sample_ids
+def get_list_samples_name_TTBOX(path_audioSegments, extension='.mat'):
+    states=['active','missing queen','swarm' ]
+    X_ttbox=[]
+    labels=[]
+    Y=[]
+    sample_ids=[]
+    # Recupèrer tout les audios d'extention .wav"""""" glob.glob(path_audioSegments_folder+'*'+extension)""""""
+    #list_mfcc=[os.path.basename(x) for x in glob.glob(path_audioSegments+'*'+extension)]
+    
+    for x in glob.glob(path_audioSegments+'*'+extension): 
+        size=len(path_audioSegments)
+        sample=x[size:]
+        sample_ids.append(sample)
+        l= read_HiveState_fromSampleName( sample, states)
+        labels.append(l)
+        m=scipy.io.loadmat(x)
+        X_ttbox.append(m['ttb_vec'])
+    
+    Y= labels2binary('active', labels)
+        
+    return X_ttbox,  labels , Y, sample_ids
+
+
+
+#_________________________________________________________________
+
+
+
+
+
+#_____________________________________TTBOX+SVM________________________________________________________________________
+
+def get_list_samples_name(path_audioSegments, extension='.mat'):
+    X_ttbox=[]
+    sample_ids=[]
+    # Recupèrer tout les audios d'extention .mat"""""" glob.glob(path_audioSegments_folder+'*'+extension)""""""
+    list_ttbox=[os.path.basename(x) for x in glob.glob(path_audioSegments+'*'+extension)]
+    for x in glob.glob(path_audioSegments+'*'+extension):
+        
+        sample_ids.append(x[63:])
+        m=scipy.io.loadmat(x)
+        X_ttbox.append(m['ttb_vec'])
+    return X_ttbox, sample_ids, list_ttbox
+
+
+
+
+
+def fit_and_evaluate(train_x, val_x, train_y, val_y, EPOCHS=50, BATCH_SIZE=145 ):
+    model=None
+    model=deep_model(( 20,44, 1))
+    results= model.fit(train_x, train_y, epochs=EPOCHS, batch_size= BATCH_SIZE, callbacks=[early_stopping, model_checkpoint], verbose=1, validation_split=0.1)
+    print("Val Score :", model.evaluate(val_x, val_y))
+    return results 
+
+def BalanceData_online(y_set, x_set, sample_ids_set):
+    
+    ## balances already processed data (X and Y, just before classifier) by replicating samples of the least represented class.
+    # input: y_set - binary labels of set, x_set - feature_maps of set, sample_ids_set - sample names in set, ( all have the same order!)
+    # output: X, Y and sample_ids with replicated samples concatenated 
+    
+ 
+    printb( 'Balancing training data:' )
+    print('will randomly replicate samples from least represented class')
+    
+    x2concatenate = x_set
+    y2concatenate = y_set
+    sample_ids2concatenate = sample_ids_set
+    
+    dict_items_replicate = get_items2replicate(y_set,sample_ids_set )
+    #print("dict_items_replicate: ",dict_items_replicate)
+    
+    for i in range(len(sample_ids_set)):
+        if sample_ids_set[i] in dict_items_replicate.keys() :
+            
+            sample_ids2concatenate =np.concatenate([sample_ids2concatenate, [sample_ids_set[i]]*dict_items_replicate[sample_ids_set[i]]])
+            y2concatenate = np.concatenate([y2concatenate, [y_set[i]]*dict_items_replicate[sample_ids_set[i]]])
+            x2concatenate = np.concatenate([x2concatenate, [x_set[i]]*dict_items_replicate[sample_ids_set[i]]])
+            
+    return y2concatenate, x2concatenate, sample_ids2concatenate
+
+
+def get_items2replicate(list_Binary_labels, list_sample_ids):
+    
+    # get the samples to be replicated.
+    # input: list of labels and sample_ids with same oreder!
+    # ouptut: dictionary keys:name of samples to be replicated,  value: Number of times to replicate that sample.
+    
+    #assert( len(list_Binary_labels) - len(list_sample_ids) == 0), ('arguments should have the same number of elements)
+    dict_items_replicate={}
+    
+    n_samples = len(list_Binary_labels)# 193
+    #print("n_samples: ", list_Binary_labels)
+    n_positive_labels = sum(list_Binary_labels)#158 = le nbr de 1
+    #print("n_positive_labels: ",n_positive_labels)
+    n_negative_labels = n_samples - n_positive_labels #35= le nbr de 0
+    #print("n_negative_labels: ",n_negative_labels)
+    
+    pos_samples=[]
+    neg_samples=[]
+    
+    for i in range(n_samples):
+        if list_Binary_labels[i] == 1 :
+            #print("list_sample_ids[i]= : ", list_sample_ids[i])
+            pos_samples.append(list_sample_ids[i])
+        else: 
+            neg_samples.append(list_sample_ids[i])
+            
+    if n_positive_labels > n_negative_labels:
+        #print(n_positive_labels, n_negative_labels)
+        # Replicate negative samples as needed:
+        dif=n_positive_labels-n_negative_labels
+        items_replicate=random.choices(neg_samples, k=dif)
+       # print("neg_samples= ",neg_samples, "items_replicate=",items_replicate)
+ 
+    elif n_positive_labels < n_negative_labels:
+        dif=n_negative_labels-n_positive_labels
+        items_replicate=random.choices(pos_samples, k=dif)
+              
+    dict_items_replicate=Counter(items_replicate)
+    #print(dict_items_replicate)
+    return dict_items_replicate
